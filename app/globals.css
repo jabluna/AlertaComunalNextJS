@@ -24,3 +24,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Tema del panel Admin: una sola preferencia global para todas sus rutas. */
+html[data-admin-theme="light"], html[data-admin-theme="light"] body { --background:#f5f8fc; --foreground:#172033; color-scheme:light; }
+html[data-admin-theme="dark"], html[data-admin-theme="dark"] body { --background:#050a13; --foreground:#eaf2ff; color-scheme:dark; }

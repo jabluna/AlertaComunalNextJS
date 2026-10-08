@@ -1,0 +1,16 @@
+ALERTA COMUNAL - createCommunityUser
+
+Esta carpeta NO reemplaza tus Functions actuales.
+La pantalla /admin/comunidad ya llama a una nueva callable llamada createCommunityUser.
+
+Para activarla en producción hay que agregar esta función al proyecto de Firebase Functions existente y desplegar SOLO esta función.
+No se modifica sendCommunityNotification, por lo tanto la web HTML actual sigue funcionando.
+
+IMPORTANTE:
+- Si tu index.js ya inicializa firebase-admin, no llames admin.initializeApp() otra vez.
+- Si tus Functions están escritas con exports.nombre = functions.https.onCall(...), puedes copiar el cuerpo/export de createCommunityUser.js a tu index.js.
+- Despliegue selectivo recomendado: firebase deploy --only functions:createCommunityUser
+
+La función valida la contraseña actual del administrador contra:
+clients/{clientCode}/perfil/{identification}/datos/password
+antes de crear o vincular una cuenta de Firebase Authentication.
