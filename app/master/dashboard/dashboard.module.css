@@ -647,3 +647,12 @@
 .muted { color: #a7b1ba; }
 
 .passwordCell{display:flex;align-items:center;gap:8px;white-space:nowrap}.passwordCell code{min-width:74px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.eyeBtn{border:1px solid #d5dbe5;background:#fff;border-radius:7px;padding:5px 8px;cursor:pointer;font-size:11px}.eyeBtn:hover{background:#f2f5f9}
+
+/* Permisos destacados del cliente: cuatro columnas equilibradas. */
+.featuresGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.featuresGrid > * { min-width: 0; }
+.featurePermission { padding: 10px; border: 1px solid #bfdbfe; border-radius: 12px; background: linear-gradient(145deg, #eff6ff, #f8fafc); }
+.featurePermission select { width: 100%; }
+.featurePermission small { display: block; margin-top: 5px; color: #475569; font-size: 11px; }
+@media (max-width: 1000px) { .featuresGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .featuresGrid { grid-template-columns: minmax(0, 1fr); } }
