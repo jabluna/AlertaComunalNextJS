@@ -44,6 +44,7 @@ const emptyClient = {
   activarChat: "no",
   habilitarLogo: "no",
   habilitarNombreComercial: "no",
+  habilitarPanicoPorVoz: "no",
   initialAddress: "",
   initialLat: "",
   initialLng: "",
@@ -117,7 +118,7 @@ export default function MasterDashboardPage() {
   const [registeredEmails, setRegisteredEmails] = useState<string[]>([]);
   const [clientPasswords, setClientPasswords] = useState<Record<string,string>>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string,boolean>>({});
-  const [additional, setAdditional] = useState<any>({codigo:"",password:"",identificacion:"",nombre:"",ciudad:"",chat:"no",habilitarLogo:"no",habilitarNombreComercial:"no",tipoPlan:"",valorPlan:"",emails:"0",fecha:"",initialAddress:"",initialLat:"",initialLng:""});
+  const [additional, setAdditional] = useState<any>({codigo:"",password:"",identificacion:"",nombre:"",ciudad:"",chat:"no",habilitarLogo:"no",habilitarNombreComercial:"no",habilitarPanicoPorVoz:"no",tipoPlan:"",valorPlan:"",emails:"0",fecha:"",initialAddress:"",initialLat:"",initialLng:""});
   const [planSearch, setPlanSearch] = useState("");
   const [planPage, setPlanPage] = useState(1);
   const planPageSize = 10;
@@ -280,6 +281,7 @@ export default function MasterDashboardPage() {
       activarChat: row.chatActivado ? "si":"no",
       habilitarLogo: row.permitirLogo ? "si":"no",
       habilitarNombreComercial: row.permitirNombreComercial ? "si":"no",
+      habilitarPanicoPorVoz: row.permitirPanicoPorVoz ? "si":"no",
       initialAddress: row.punto_inicial?.address || "",
       initialLat: row.punto_inicial?.lat || "",
       initialLng: row.punto_inicial?.lng || "",
@@ -331,6 +333,7 @@ export default function MasterDashboardPage() {
         password, chatActivado:form.activarChat==="si",
         permitirLogo:form.habilitarLogo==="si",
         permitirNombreComercial:form.habilitarNombreComercial==="si",
+        permitirPanicoPorVoz:form.habilitarPanicoPorVoz==="si",
         punto_inicial:{address:form.initialAddress.trim(),lat:form.initialLat,lng:form.initialLng}
       };
       const data:any = form.clientType==="empresa" ? {
@@ -542,7 +545,7 @@ export default function MasterDashboardPage() {
         password:additional.password,chatActivado:additional.chat==="si", estado:"activo",
         nodoAdicional:true,nodoOrigen:registeredNode,creadoDesdeGestionClientes:true,fechaCreacionNodoAdicional:new Date().toISOString(),
         punto_inicial:{address:String(additional.initialAddress||"").trim(),lat:String(additional.initialLat||""),lng:String(additional.initialLng||"")},
-        permitirLogo:additional.habilitarLogo==="si", permitirNombreComercial:additional.habilitarNombreComercial==="si",
+        permitirLogo:additional.habilitarLogo==="si", permitirNombreComercial:additional.habilitarNombreComercial==="si", permitirPanicoPorVoz:additional.habilitarPanicoPorVoz==="si",
       };
       delete data.rowKey; delete data.identificacion;
       const key=safeEmailKey(registeredEmail);
@@ -707,7 +710,12 @@ export default function MasterDashboardPage() {
         <div className={`${styles.modal} ${(modal==="client"||modal==="additional")?styles.modalWide:""}`}>
           {modal==="choice" && <><ModalHead title="Nuevo cliente" subtitle="Seleccione el tipo de operación" close={()=>setModal(null)}/><div className={styles.choiceGrid}><button onClick={openCreate}><b>+</b><strong>Crear cliente nuevo</strong><span>Registrar una nueva comunidad desde cero.</span></button><button onClick={()=>setModal("additional")}><b>↗</b><strong>Crear nodo padre adicional</strong><span>Partir de un usuario o comunidad ya registrada.</span></button></div></>}
           {modal==="client" && <form onSubmit={saveClient}><ModalHead title={editing?"Editar cliente":"Crear cliente"} subtitle="Perfil, plan, permisos y acceso de la comunidad" close={()=>setModal(null)}/><div className={styles.modalBody}>
-            <Section title="Tipo de cliente"><Field label="Empresa / Persona natural"><select value={form.clientType} onChange={e=>setField("clientType",e.target.value)} required disabled={!!editing}><option value="">Seleccione...</option><option value="empresa">Empresa</option><option value="persona">Persona natural</option></select></Field></Section>
+            <Section title="Tipo de cliente y funcionalidades"><div className={styles.featuresGrid}>
+              <Field label="Empresa / Persona natural"><select value={form.clientType} onChange={e=>setField("clientType",e.target.value)} required disabled={!!editing}><option value="">Seleccione...</option><option value="empresa">Empresa</option><option value="persona">Persona natural</option></select></Field>
+              <div className={styles.featurePermission}><Field label="Habilitar Logo"><select value={form.habilitarLogo} onChange={e=>setField("habilitarLogo",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Personalización del logo.</small></Field></div>
+              <div className={styles.featurePermission}><Field label="Habilitar Nombre Comercial"><select value={form.habilitarNombreComercial} onChange={e=>setField("habilitarNombreComercial",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Nombre comercial propio.</small></Field></div>
+              <div className={styles.featurePermission}><Field label="Habilitar Pánico por Voz"><select value={form.habilitarPanicoPorVoz} onChange={e=>setField("habilitarPanicoPorVoz",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Autoriza esta función para el nodo.</small></Field></div>
+            </div></Section>
             {form.clientType==="empresa" && <Section title="Datos de empresa"><Grid>
               <Input label="NIT" value={form.nit} set={v=>setField("nit",v)} required/><Input label="Código de cliente" value={form.codigoClienteEmpresa} set={v=>setField("codigoClienteEmpresa",v)} required disabled={!!editing}/>
               <Input label="Razón social" value={form.razonSocial} set={v=>setField("razonSocial",v)}/><Input label="Ciudad" value={form.ciudadEmpresa} set={v=>setField("ciudadEmpresa",v)}/>
@@ -725,8 +733,7 @@ export default function MasterDashboardPage() {
               <Input label="Valor del plan" type="number" value={form.valorPlan} set={v=>setField("valorPlan",v)}/><Input label="Emails disponibles" type="number" value={form.emailsDisponibles} set={v=>setField("emailsDisponibles",v)}/>
               <Input label="Fecha de activación" type="date" value={form.fechaActivacion} set={v=>setField("fechaActivacion",v)}/><Input label="Contraseña" value={form.password} set={v=>setField("password",v)} required/>
               <Field label="Habilitar Chat"><select value={form.activarChat} onChange={e=>setField("activarChat",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select></Field>
-              <Field label="Habilitar Logo"><select value={form.habilitarLogo} onChange={e=>setField("habilitarLogo",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Permite al cliente personalizar el logo desde su Admin Web.</small></Field>
-              <Field label="Habilitar Nombre Comercial"><select value={form.habilitarNombreComercial} onChange={e=>setField("habilitarNombreComercial",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Permite al cliente definir su nombre comercial.</small></Field>
+
             </Grid></Section>
             <Section title="Ubicación inicial"><Grid><Input label="Dirección inicial" value={form.initialAddress} set={v=>setField("initialAddress",v)}/><Field label="Geocodificación"><button type="button" className={styles.secondary} onClick={geocodeAddress}>Obtener coordenadas</button></Field><Input label="Latitud" value={form.initialLat} set={v=>setField("initialLat",v)}/><Input label="Longitud" value={form.initialLng} set={v=>setField("initialLng",v)}/></Grid>{mapPreviewUrl && <div className={styles.mapBox}><iframe title="Ubicación inicial del cliente" src={mapPreviewUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /></div>}</Section>
             <Section title="Logo del cliente"><p className={styles.sectionNote}>Puedes asignar el logo inicial del cliente desde Master. Si “Habilitar Logo” está activo, el cliente también podrá modificarlo desde su Admin Web.</p><Field label="Logo (máx. 500KB)"><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0]||null;setLogoFile(f);if(f)setLogoPreview(URL.createObjectURL(f))}}/>{logoPreview&&<img className={styles.logoPreview} src={logoPreview} alt="Logo"/>}</Field></Section>
