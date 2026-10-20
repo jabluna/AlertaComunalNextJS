@@ -349,6 +349,7 @@ export default function MasterDashboardPage() {
       if (logoUrl) data.logoUrl=logoUrl;
       const updates:AnyData = {};
       updates[`clients/${codigo}/perfil/${identificacion}/datos`] = data;
+      updates[`clients/${codigo}/notification_settings/button_assignments`] = {"ayuda":"alguienapoyo","general":"alarmagl","hurto":"sospechoso","protocolo":"protocolo"};
       updates[`clientCodes/${password}`] = codigo;
       if (editing && editing.password && editing.password !== password) updates[`clientCodes/${editing.password}`] = null;
       await update(ref(db),updates);
@@ -551,6 +552,7 @@ export default function MasterDashboardPage() {
       const key=safeEmailKey(registeredEmail);
       const updates:AnyData={};
       updates[`clients/${additional.codigo}/perfil/${additional.identificacion}/datos`]=data;
+      updates[`clients/${additional.codigo}/notification_settings/button_assignments`]={"ayuda":"alguienapoyo","general":"alarmagl","hurto":"sospechoso","protocolo":"protocolo"};
       updates[`clients/${additional.codigo}/allowedEmails/${key}`]=true;
       updates[`clients/${registeredNode}/allowedEmails/${key}`]=true;
       updates[`clientCodes/${additional.password}`]=additional.codigo;
