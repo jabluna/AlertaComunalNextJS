@@ -103,6 +103,8 @@ export default function AdminDashboard() {
   const [liveVideoUrl, setLiveVideoUrl] = useState("");
   const [liveVideoError, setLiveVideoError] = useState("");
   const [liveLoading, setLiveLoading] = useState(false);
+  const [liveDeleting, setLiveDeleting] = useState<string | null>(null);
+  const [liveResolvedNames, setLiveResolvedNames] = useState<Record<string,string>>({});
   const seenLiveIdsRef = useRef<Set<string> | null>(null);
   const [panicOpen, setPanicOpen] = useState(false);
   const [panicMuted, setPanicMuted] = useState(false);
@@ -371,6 +373,43 @@ export default function AdminDashboard() {
     }
   }, [code]);
 
+  const deleteLiveRecording = useCallback(async (record: AnyRecord) => {
+    const sessionId = String(record.sessionId || "");
+    if (!sessionId || liveDeleting) return;
+    if (!window.confirm(`¿Eliminar definitivamente la grabación de ${record.publisherName || "este usuario"}? Se borrará el video de Storage y no se podrá recuperar.`)) return;
+    setLiveDeleting(sessionId);
+    try {
+      const action = httpsCallable<{clientId:string;sessionId:string},{ok:boolean}>(
+        getFunctions(app,"southamerica-east1"),"alertaLiveDeleteRecording"
+      );
+      await action({clientId:code,sessionId});
+      if (liveViewed?.sessionId === sessionId) {
+        setLiveViewed(null);
+        setLiveVideoUrl("");
+      }
+    } catch (error:any) {
+      window.alert(error?.message || "No fue posible eliminar la grabación.");
+    } finally {
+      setLiveDeleting(null);
+    }
+  },[code,liveDeleting,liveViewed]);
+
+  useEffect(() => {
+    const ids = [...liveRecordings,...liveSessions].map(x => String(x.publisherUid || "")).filter(Boolean);
+    const missing = [...new Set(ids)].filter(uid => !liveResolvedNames[uid]);
+    if (!code || !missing.length) return;
+    let cancelled = false;
+    Promise.all(missing.map(async uid => {
+      try {
+        const snapshot = await get(ref(db,`clients/${code}/users/${uid}`));
+        const user = snapshot.val() || {};
+        const name = [user.nombreCompleto,user.displayName,user.nombre,user.name,user.datos?.nombreCompleto,user.datos?.nombre,user.datos?.nombres].find(v => typeof v === "string" && v.trim());
+        return [uid,name || "Usuario no identificado"] as const;
+      } catch { return [uid,"Usuario no identificado"] as const; }
+    })).then(items => {if(!cancelled) setLiveResolvedNames(prev=>({...prev,...Object.fromEntries(items)}));});
+    return () => {cancelled=true;};
+  },[code,liveRecordings,liveSessions,liveResolvedNames]);
+
   const deletePanic = useCallback(async (panic: AnyRecord) => {
     const key = panic.panicKey || panic.id;
     if (!key || !window.confirm("¿Está seguro que desea eliminar esta alerta de pánico?")) return;
@@ -461,13 +500,13 @@ export default function AdminDashboard() {
       <p>Transmisiones del nodo y grabaciones almacenadas.</p>
       <div className={styles.panicList}>
       {liveSessions.filter(x => x.status === "live").map(x => <article className={styles.panicItem} key={x.sessionId}><div className={styles.panicAlertIcon}>🔴</div><div className={styles.panicText}><strong>{x.publisherName || "Vecino"} <span>está transmitiendo en vivo</span></strong><small>{new Date(Number(x.startedAt || Date.now())).toLocaleString("es-CO")}</small><small>La transmisión está activa. Su grabación aparecerá cuando finalice y se procese.</small></div></article>)}
-      {liveRecordings.filter(x => x.status === "ready").map(x => <article className={styles.panicItem} key={x.sessionId}><div className={styles.panicAlertIcon}>🎬</div><div className={styles.panicText}><strong>{x.publisherName || "Vecino"} <span>· Grabación disponible</span></strong><small>{new Date(Number(x.startedAt || x.completedAt || Date.now())).toLocaleString("es-CO")}</small></div><div className={styles.panicItemActions}><button className={styles.panicMapBtn} title="Reproducir grabación" onClick={() => void openLiveRecording(x)}>▶ Ver</button></div></article>)}
+      {liveRecordings.filter(x => x.status === "ready").map(x => <article key={x.sessionId} style={{display:"flex",alignItems:"center",gap:14,padding:16,border:"1px solid #e2e8f0",borderRadius:16,background:"linear-gradient(125deg,#fff,#f8fafc)",boxShadow:"0 5px 18px rgba(15,23,42,.06)",flexWrap:"wrap"}}><div style={{width:48,height:48,borderRadius:14,display:"grid",placeItems:"center",fontSize:23,background:"#fee2e2"}}>🎬</div><div style={{flex:"1 1 200px",minWidth:0}}><strong style={{display:"block",fontSize:15,color:"#0f172a"}}>{liveResolvedNames[x.publisherUid] && liveResolvedNames[x.publisherUid] !== "Usuario no identificado" ? liveResolvedNames[x.publisherUid] : (x.publisherName || "Vecino")}</strong><small style={{display:"block",color:"#64748b",marginTop:4}}>{new Date(Number(x.startedAt || x.completedAt || Date.now())).toLocaleString("es-CO")}</small><span style={{display:"inline-block",marginTop:7,padding:"4px 9px",background:"#dcfce7",color:"#166534",fontSize:11,fontWeight:700,borderRadius:99}}>● VIDEO DISPONIBLE</span></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={{background:"#b91c1c",color:"white",border:0,borderRadius:10,padding:"11px 16px",fontWeight:700,cursor:"pointer"}} onClick={() => void openLiveRecording(x)}>▶ Reproducir</button><button type="button" disabled={liveDeleting === x.sessionId} style={{background:"#fff",color:"#b91c1c",border:"1px solid #fecaca",borderRadius:10,padding:"11px 14px",fontWeight:700,cursor:"pointer",opacity:liveDeleting === x.sessionId ? .5 : 1}} onClick={() => void deleteLiveRecording(x)}>{liveDeleting === x.sessionId ? "Eliminando..." : "🗑 Eliminar"}</button></div></article>)}
       {liveSessions.filter(x => x.status === "live").length === 0 && liveRecordings.filter(x => x.status === "ready").length === 0 && <p>No hay transmisiones activas ni videos disponibles.</p>}
       </div>
       
       </div><div className={styles.panicModalFoot}><button onClick={() => {setLiveOpen(false);setLiveViewed(null);setLiveVideoUrl("");}}>Cerrar</button></div></div></div>}
     {liveViewed && <div className={styles.panicModalBack} style={{zIndex:100010}}><div className={styles.panicModal} style={{width:"min(96vw,980px)",maxWidth:980,maxHeight:"94vh",overflowY:"auto"}}><div className={styles.panicModalHead}><div className={styles.panicTitle}><span>🎬</span><strong>GRABACIÓN ALERTA LIVE</strong></div><button className={styles.panicCloseX} onClick={() => {setLiveViewed(null);setLiveVideoUrl("");setLiveVideoError("");}}>×</button></div><div className={styles.panicModalBody} style={{display:"grid",gap:16}}>
-      <div><strong>{liveViewed.publisherName || "Vecino"}</strong><p style={{margin:"6px 0"}}>Nodo: {code} · Fecha: {new Date(Number(liveViewed.startedAt || liveViewed.completedAt || Date.now())).toLocaleString("es-CO")}</p><small>Usuario: {liveViewed.publisherUid || "No disponible"} · Sesión: {liveViewed.sessionId || "No disponible"}</small></div>
+      <div><strong>{liveResolvedNames[liveViewed.publisherUid] && liveResolvedNames[liveViewed.publisherUid] !== "Usuario no identificado" ? liveResolvedNames[liveViewed.publisherUid] : (liveViewed.publisherName || "Vecino")}</strong><p style={{margin:"6px 0"}}>Nodo: {code} · Fecha: {new Date(Number(liveViewed.startedAt || liveViewed.completedAt || Date.now())).toLocaleString("es-CO")}</p><small>Grabación de la comunidad · Identificador de sesión: {liveViewed.sessionId || "No disponible"}</small></div>
       {liveLoading ? <p>Cargando video...</p> : liveVideoError ? <p role="alert" style={{color:"#dc2626"}}>{liveVideoError}</p> : liveVideoUrl ? <video key={liveVideoUrl} src={liveVideoUrl} controls playsInline autoPlay style={{width:"100%",maxHeight:"52vh",background:"#000",borderRadius:12}}/> : null}
       <div><strong>📍 Origen de la transmisión</strong><LiveOriginMap location={liveViewed.location} mapEl={liveMapEl}/></div>
       </div><div className={styles.panicModalFoot}><button onClick={() => {setLiveViewed(null);setLiveVideoUrl("");setLiveVideoError("");}}>Cerrar reproductor</button></div></div></div>}
