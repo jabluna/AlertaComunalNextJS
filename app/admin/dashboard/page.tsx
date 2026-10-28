@@ -99,6 +99,7 @@ export default function AdminDashboard() {
   const [liveRecordings, setLiveRecordings] = useState<AnyRecord[]>([]);
   const [liveOpen, setLiveOpen] = useState(false);
   const [liveViewed, setLiveViewed] = useState<AnyRecord | null>(null);
+  const liveMapEl = useRef<HTMLDivElement | null>(null);
   const [liveVideoUrl, setLiveVideoUrl] = useState("");
   const [liveVideoError, setLiveVideoError] = useState("");
   const [liveLoading, setLiveLoading] = useState(false);
@@ -463,11 +464,37 @@ export default function AdminDashboard() {
       {liveRecordings.filter(x => x.status === "ready").map(x => <article className={styles.panicItem} key={x.sessionId}><div className={styles.panicAlertIcon}>🎬</div><div className={styles.panicText}><strong>{x.publisherName || "Vecino"} <span>· Grabación disponible</span></strong><small>{new Date(Number(x.startedAt || x.completedAt || Date.now())).toLocaleString("es-CO")}</small></div><div className={styles.panicItemActions}><button className={styles.panicMapBtn} title="Reproducir grabación" onClick={() => void openLiveRecording(x)}>▶ Ver</button></div></article>)}
       {liveSessions.filter(x => x.status === "live").length === 0 && liveRecordings.filter(x => x.status === "ready").length === 0 && <p>No hay transmisiones activas ni videos disponibles.</p>}
       </div>
-      {liveViewed && <section style={{marginTop:18}}><strong>🎬 Grabación de {liveViewed.publisherName || "Vecino"}</strong>{liveLoading ? <p>Cargando video...</p> : liveVideoError ? <p role="alert" style={{color:"#dc2626"}}>{liveVideoError}</p> : liveVideoUrl ? <video key={liveVideoUrl} src={liveVideoUrl} controls playsInline style={{display:"block",width:"100%",maxHeight:400,background:"#000",borderRadius:12,marginTop:12}}/> : null}</section>}
+      
       </div><div className={styles.panicModalFoot}><button onClick={() => {setLiveOpen(false);setLiveViewed(null);setLiveVideoUrl("");}}>Cerrar</button></div></div></div>}
+    {liveViewed && <div className={styles.panicModalBack} style={{zIndex:100010}}><div className={styles.panicModal} style={{width:"min(96vw,980px)",maxWidth:980,maxHeight:"94vh",overflowY:"auto"}}><div className={styles.panicModalHead}><div className={styles.panicTitle}><span>🎬</span><strong>GRABACIÓN ALERTA LIVE</strong></div><button className={styles.panicCloseX} onClick={() => {setLiveViewed(null);setLiveVideoUrl("");setLiveVideoError("");}}>×</button></div><div className={styles.panicModalBody} style={{display:"grid",gap:16}}>
+      <div><strong>{liveViewed.publisherName || "Vecino"}</strong><p style={{margin:"6px 0"}}>Nodo: {code} · Fecha: {new Date(Number(liveViewed.startedAt || liveViewed.completedAt || Date.now())).toLocaleString("es-CO")}</p><small>Usuario: {liveViewed.publisherUid || "No disponible"} · Sesión: {liveViewed.sessionId || "No disponible"}</small></div>
+      {liveLoading ? <p>Cargando video...</p> : liveVideoError ? <p role="alert" style={{color:"#dc2626"}}>{liveVideoError}</p> : liveVideoUrl ? <video key={liveVideoUrl} src={liveVideoUrl} controls playsInline autoPlay style={{width:"100%",maxHeight:"52vh",background:"#000",borderRadius:12}}/> : null}
+      <div><strong>📍 Origen de la transmisión</strong><LiveOriginMap location={liveViewed.location} mapEl={liveMapEl}/></div>
+      </div><div className={styles.panicModalFoot}><button onClick={() => {setLiveViewed(null);setLiveVideoUrl("");setLiveVideoError("");}}>Cerrar reproductor</button></div></div></div>}
     {profileOpen && <ProfileModal code={code} identification={identification} profile={profile} onClose={() => setProfileOpen(false)} onSaved={setProfile}/>}
     {communityAlarmOpen && <CommunityAlarmModal code={code} sending={sendingAlarm} message={alarmMessage} onSend={sendCommunityAlarm} onClose={() => setCommunityAlarmOpen(false)}/>}
   </main>;
+}
+
+function LiveOriginMap({location,mapEl}:{location:any;mapEl:React.RefObject<HTMLDivElement | null>}) {
+  const lat = Number(location?.lat ?? location?.latitude);
+  const lng = Number(location?.lng ?? location?.longitude);
+  const valid = location && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  useEffect(() => {
+    if (!valid) return;
+    let disposed = false;
+    let map:any = null;
+    loadMaps().then(async () => {
+      await window.google?.maps?.importLibrary?.("maps");
+      if (disposed || !mapEl.current || !window.google?.maps) return;
+      map = new window.google.maps.Map(mapEl.current,{center:{lat,lng},zoom:16,mapTypeControl:true});
+      const marker = new window.google.maps.Marker({position:{lat,lng},map,title:"Origen de Alerta Live"});
+      const info = new window.google.maps.InfoWindow({content:"<strong>Origen de Alerta Live</strong><br/>"+lat.toFixed(6)+", "+lng.toFixed(6)});
+      marker.addListener("click",()=>info.open(map,marker));
+    }).catch(()=>{});
+    return () => {disposed=true;map=null;};
+  },[lat,lng,valid,mapEl]);
+  return <div style={{marginTop:10}}>{valid ? <><p style={{margin:"6px 0"}}>Latitud: {lat.toFixed(6)} · Longitud: {lng.toFixed(6)}{location?.accuracy ? ` · Precisión: ${location.accuracy} m` : ""}</p><div ref={mapEl} style={{height:260,width:"100%",borderRadius:12,background:"#e2e8f0"}}/></> : <p>Esta grabación no contiene coordenadas de origen.</p>}</div>;
 }
 
 function CommunityAlarmModal({ code, sending, message, onSend, onClose }: { code: string; sending: string | null; message: string; onSend: (key: string) => void; onClose: () => void }) {
