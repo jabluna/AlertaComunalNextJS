@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { uploadBytes, getDownloadURL, ref as storageRef } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { get, onValue, push, ref, remove, serverTimestamp, set, Unsubscribe } from "firebase/database";
-import { app, db, functions } from "@/lib/firebase";
+import { app, auth, db, functions } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 import { httpsCallable } from "firebase/functions";
 import styles from "./dashboard.module.css";
@@ -125,6 +126,7 @@ export default function AdminDashboard() {
 
   const logout = useCallback(() => {
     ["loggedInClientCode", "loggedInClientIdentification", "isMasterLogin", "userEmail", "loggedInUserEmail", "activeClientCode", "activeClientIdentification", "selectedClientNode"].forEach(k => localStorage.removeItem(k));
+    void signOut(auth);
     router.replace("/admin/login");
   }, [router]);
 
@@ -354,6 +356,7 @@ export default function AdminDashboard() {
     setLiveVideoError("");
     setLiveLoading(true);
     try {
+      if (!auth.currentUser) throw new Error("Vuelve a iniciar sesión en el panel para habilitar la reproducción segura.");
       const playback = httpsCallable<{clientId: string; sessionId: string}, {url: string}>(
         getFunctions(app, "southamerica-east1"), "alertaLivePlayback"
       );
@@ -361,7 +364,7 @@ export default function AdminDashboard() {
       if (!response.data?.url) throw new Error("No se recibió el enlace de reproducción.");
       setLiveVideoUrl(response.data.url);
     } catch (error: any) {
-      setLiveVideoError(error?.code === "functions/unauthenticated" || error?.code === "functions/permission-denied" ? "El acceso web aún requiere autenticación Firebase compatible con la reproducción protegida. No se abrirá el video sin autorización." : (error?.message || "No se pudo abrir la grabación."));
+      setLiveVideoError(error?.message || "No se pudo abrir la grabación.");
     } finally {
       setLiveLoading(false);
     }
