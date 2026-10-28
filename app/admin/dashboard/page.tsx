@@ -223,7 +223,7 @@ export default function AdminDashboard() {
       }
     });
     const unsubLiveSessions = onValue(ref(db, `clients/${clientCode}/alertaLive/sessions`), snapshot => {
-      const list = Object.entries(snapshot.val() || {}).map(([sessionId, raw]) => ({
+      const list: AnyRecord[] = Object.entries(snapshot.val() || {}).map(([sessionId, raw]) => ({
         ...(raw as AnyRecord), sessionId, clientId: clientCode,
       })).sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
       setLiveSessions(list);
@@ -238,7 +238,7 @@ export default function AdminDashboard() {
       seenLiveIdsRef.current = activeIds;
     });
     const unsubLiveRecordings = onValue(ref(db, `clients/${clientCode}/alertaLive/recordings`), snapshot => {
-      const list = Object.entries(snapshot.val() || {}).map(([sessionId, raw]) => ({
+      const list: AnyRecord[] = Object.entries(snapshot.val() || {}).map(([sessionId, raw]) => ({
         ...(raw as AnyRecord), sessionId, clientId: clientCode,
       })).sort((a,b) => Number(b.startedAt || b.completedAt || 0) - Number(a.startedAt || a.completedAt || 0));
       setLiveRecordings(list);
