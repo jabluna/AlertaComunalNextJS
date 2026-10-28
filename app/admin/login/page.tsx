@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { get, ref } from "firebase/database";
-import { db } from "@/lib/firebase";
+import { auth, db, app } from "@/lib/firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { signInWithCustomToken } from "firebase/auth";
 import styles from "./login.module.css";
 
 function normalizeEmail(email: string) {
@@ -138,6 +140,9 @@ export default function AdminLoginPage() {
         return;
       }
 
+      const login = httpsCallable<{clientId:string;email:string;password:string},{token:string}>(getFunctions(app,"southamerica-east1"),"alertaLiveWebAdminLogin");
+      const tokenResult = await login({clientId:code,email:userEmail,password:pass});
+      await signInWithCustomToken(auth,tokenResult.data.token);
       setMessage({text:"Inicio de sesión exitoso. Cargando comunidad...",type:"success"});
       saveSessionAndRedirect(code,result.identificationKey,userEmail);
     } catch (err) {
