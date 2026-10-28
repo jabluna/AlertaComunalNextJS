@@ -6,6 +6,7 @@ import { uploadBytes, getDownloadURL, ref as storageRef } from "firebase/storage
 import { storage } from "@/lib/firebase";
 import { get, onValue, push, ref, remove, serverTimestamp, set, Unsubscribe } from "firebase/database";
 import { db, functions } from "@/lib/firebase";
+import { getFunctions } from "firebase/functions";
 import { httpsCallable } from "firebase/functions";
 import styles from "./dashboard.module.css";
 
@@ -93,6 +94,14 @@ export default function AdminDashboard() {
   const [nodes, setNodes] = useState<NodeItem[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [panics, setPanics] = useState<AnyRecord[]>([]);
+  const [liveSessions, setLiveSessions] = useState<AnyRecord[]>([]);
+  const [liveRecordings, setLiveRecordings] = useState<AnyRecord[]>([]);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [liveViewed, setLiveViewed] = useState<AnyRecord | null>(null);
+  const [liveVideoUrl, setLiveVideoUrl] = useState("");
+  const [liveVideoError, setLiveVideoError] = useState("");
+  const [liveLoading, setLiveLoading] = useState(false);
+  const seenLiveIdsRef = useRef<Set<string> | null>(null);
   const [panicOpen, setPanicOpen] = useState(false);
   const [panicMuted, setPanicMuted] = useState(false);
   const [panicFocus, setPanicFocus] = useState<AnyRecord | null>(null);
@@ -155,6 +164,11 @@ export default function AdminDashboard() {
     setProfile(result.data);
     setSelected(null);
     setComments([]);
+    setLiveSessions([]);
+    setLiveRecordings([]);
+    setLiveOpen(false);
+    setLiveViewed(null);
+    seenLiveIdsRef.current = null;
     localStorage.setItem("activeClientCode", clientCode);
     localStorage.setItem("activeClientIdentification", result.identification);
     const share = result.data?.sharing_settings;
@@ -203,7 +217,28 @@ export default function AdminDashboard() {
         if (audio) { audio.pause(); audio.currentTime = 0; }
       }
     });
-    listenersRef.current = [unsubIncidents, unsubPanics];
+    const unsubLiveSessions = onValue(ref(db, `clients/${clientCode}/alertaLive/sessions`), snapshot => {
+      const list = Object.entries(snapshot.val() || {}).map(([sessionId, raw]) => ({
+        ...(raw as AnyRecord), sessionId, clientId: clientCode,
+      })).sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
+      setLiveSessions(list);
+      const activeIds = new Set(list.filter(x => x.status === "live").map(x => x.sessionId));
+      if (seenLiveIdsRef.current !== null && [...activeIds].some(id => !seenLiveIdsRef.current?.has(id))) {
+        setLiveOpen(true);
+        if (!panicMuted) {
+          const audio = panicAudioRef.current;
+          if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
+        }
+      }
+      seenLiveIdsRef.current = activeIds;
+    });
+    const unsubLiveRecordings = onValue(ref(db, `clients/${clientCode}/alertaLive/recordings`), snapshot => {
+      const list = Object.entries(snapshot.val() || {}).map(([sessionId, raw]) => ({
+        ...(raw as AnyRecord), sessionId, clientId: clientCode,
+      })).sort((a,b) => Number(b.startedAt || b.completedAt || 0) - Number(a.startedAt || a.completedAt || 0));
+      setLiveRecordings(list);
+    });
+    listenersRef.current = [unsubIncidents, unsubPanics, unsubLiveSessions, unsubLiveRecordings];
   }, [clearNodeListeners, findProfile, logout, panicMuted]);
 
   useEffect(() => {
@@ -313,6 +348,25 @@ export default function AdminDashboard() {
     setPanicOpen(false);
   }, []);
 
+  const openLiveRecording = useCallback(async (record: AnyRecord) => {
+    setLiveViewed(record);
+    setLiveVideoUrl("");
+    setLiveVideoError("");
+    setLiveLoading(true);
+    try {
+      const playback = httpsCallable<{clientId: string; sessionId: string}, {url: string}>(
+        getFunctions(undefined, "southamerica-east1"), "alertaLivePlayback"
+      );
+      const response = await playback({clientId: code, sessionId: record.sessionId});
+      if (!response.data?.url) throw new Error("No se recibió el enlace de reproducción.");
+      setLiveVideoUrl(response.data.url);
+    } catch (error: any) {
+      setLiveVideoError(error?.message || "No se pudo abrir la grabación. Comprueba los permisos del administrador.");
+    } finally {
+      setLiveLoading(false);
+    }
+  }, [code]);
+
   const deletePanic = useCallback(async (panic: AnyRecord) => {
     const key = panic.panicKey || panic.id;
     if (!key || !window.confirm("¿Está seguro que desea eliminar esta alerta de pánico?")) return;
@@ -387,6 +441,7 @@ export default function AdminDashboard() {
       <header className={styles.header}><button className={styles.mobileMenu} onClick={() => setSidebar(v => !v)}>☰</button><div><span>ADMINISTRACIÓN</span><h1>{displayName}</h1><p>Nodo activo: <b>{code}</b></p></div><div className={styles.headerRight}><span className={styles.plan}>Plan {profile?.tipoPlan || "N/A"}</span><div className={styles.avatar}>{logo ? <img src={logo} alt=""/> : displayName.slice(0, 2).toUpperCase()}</div><div className={styles.hello}>Hola, <b>{displayName}</b></div><button type="button" className={styles.headerLogout} onClick={logout} title="Cerrar sesión">↪ <span>Cerrar sesión</span></button></div></header>
       <div className={styles.metrics}><Metric title="Accidentes" value={counts.accidente} tone="red" icon="⚠"/><Metric title="Hurtos" value={counts.hurto} tone="green" icon="▣"/><Metric title="Homicidios" value={counts.homicidio} tone="blue" icon="◆"/><Metric title="Otros" value={counts.otro} tone="yellow" icon="?"/></div>
       <button className={styles.alarm} onClick={() => { setAlarmMessage(""); setCommunityAlarmOpen(true); }}>⌁ &nbsp; ALARMA COMUNITARIA</button>
+      {(liveSessions.some(x => x.status === "live") || liveRecordings.length > 0) && <button className={styles.panicBox} style={{background:"linear-gradient(110deg,#7f1d1d,#b91c1c)",marginTop:10}} onClick={() => setLiveOpen(true)}><div><strong>🔴 Alerta Live · {liveSessions.filter(x => x.status === "live").length} en vivo</strong><span>{liveRecordings.filter(x => x.status === "ready").length} grabaciones disponibles · Ver historial</span></div><b>▶</b></button>}
       {panics.length > 0 && <button className={styles.panicBox} onClick={() => setPanicOpen(true)}><div><strong>{panics.length} alerta(s) de pánico activa(s)</strong><span>Requieren atención inmediata en {code}</span></div><b>!</b></button>}
       <div className={styles.filters}>{[["all", "Todos"], ["accidente", "Accidentes"], ["hurto", "Hurtos"], ["homicidio", "Homicidios"], ["otro", "Otros"], ["heatmap-only", "Solo Mapa de Calor"]].map(([v, l]) => <button key={v} className={`${styles[`f_${v.replace("-", "_")}`] || ""} ${filter === v ? styles.filterActive : ""}`} onClick={() => setFilter(v)}>{l}</button>)}<label className={styles.share}><input type="checkbox" checked={sharing} disabled={sharing} onChange={toggleSharing}/><span/>Permitir ver mi nodo</label></div>
       <MapArea profile={profile} incidents={visible} heatOnly={filter === "heatmap-only"} selected={selected} panicFocus={panicFocus} onSelect={chooseIncident}/>
@@ -398,6 +453,15 @@ export default function AdminDashboard() {
     </section>
     <ThemeToggle/><audio ref={panicAudioRef} src="/panic-alert.wav" preload="auto"/>
     {panicOpen && panics.length > 0 && <PanicModal panics={panics} muted={panicMuted} onToggleMute={togglePanicAudio} onClose={() => setPanicOpen(false)} onView={viewPanicOnMap} onDelete={deletePanic} onDeleteAll={deleteAllPanics}/>}
+    {liveOpen && <div className={styles.panicModalBack} style={{zIndex:100000}}><div className={styles.panicModal} style={{maxWidth:760,width:"min(94vw,760px)",maxHeight:"90vh",overflowY:"auto"}}><div className={styles.panicModalHead}><div className={styles.panicTitle}><span>🔴</span><strong>ALERTA LIVE · {code}</strong></div><div className={styles.panicHeadActions}><button className={styles.panicCloseX} onClick={() => {setLiveOpen(false);setLiveViewed(null);setLiveVideoUrl("");}}>×</button></div></div><div className={styles.panicModalBody}>
+      <p>Transmisiones del nodo y grabaciones almacenadas.</p>
+      <div className={styles.panicList}>
+      {liveSessions.filter(x => x.status === "live").map(x => <article className={styles.panicItem} key={x.sessionId}><div className={styles.panicAlertIcon}>🔴</div><div className={styles.panicText}><strong>{x.publisherName || "Vecino"} <span>está transmitiendo en vivo</span></strong><small>{new Date(Number(x.startedAt || Date.now())).toLocaleString("es-CO")}</small><small>La transmisión está activa. Su grabación aparecerá cuando finalice y se procese.</small></div></article>)}
+      {liveRecordings.filter(x => x.status === "ready").map(x => <article className={styles.panicItem} key={x.sessionId}><div className={styles.panicAlertIcon}>🎬</div><div className={styles.panicText}><strong>{x.publisherName || "Vecino"} <span>· Grabación disponible</span></strong><small>{new Date(Number(x.startedAt || x.completedAt || Date.now())).toLocaleString("es-CO")}</small></div><div className={styles.panicItemActions}><button className={styles.panicMapBtn} title="Reproducir grabación" onClick={() => void openLiveRecording(x)}>▶ Ver</button></div></article>)}
+      {liveSessions.filter(x => x.status === "live").length === 0 && liveRecordings.filter(x => x.status === "ready").length === 0 && <p>No hay transmisiones activas ni videos disponibles.</p>}
+      </div>
+      {liveViewed && <section style={{marginTop:18}}><strong>🎬 Grabación de {liveViewed.publisherName || "Vecino"}</strong>{liveLoading ? <p>Cargando video...</p> : liveVideoError ? <p role="alert" style={{color:"#dc2626"}}>{liveVideoError}</p> : liveVideoUrl ? <video key={liveVideoUrl} src={liveVideoUrl} controls playsInline style={{display:"block",width:"100%",maxHeight:400,background:"#000",borderRadius:12,marginTop:12}}/> : null}</section>}
+      </div><div className={styles.panicModalFoot}><button onClick={() => {setLiveOpen(false);setLiveViewed(null);setLiveVideoUrl("");}}>Cerrar</button></div></div></div>}
     {profileOpen && <ProfileModal code={code} identification={identification} profile={profile} onClose={() => setProfileOpen(false)} onSaved={setProfile}/>}
     {communityAlarmOpen && <CommunityAlarmModal code={code} sending={sendingAlarm} message={alarmMessage} onSend={sendCommunityAlarm} onClose={() => setCommunityAlarmOpen(false)}/>}
   </main>;
