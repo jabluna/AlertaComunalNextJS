@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { uploadBytes, getDownloadURL, ref as storageRef } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { get, onValue, push, ref, remove, serverTimestamp, set, Unsubscribe } from "firebase/database";
-import { db, functions } from "@/lib/firebase";
+import { app, db, functions } from "@/lib/firebase";
 import { getFunctions } from "firebase/functions";
 import { httpsCallable } from "firebase/functions";
 import styles from "./dashboard.module.css";
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
       })).sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0));
       setLiveSessions(list);
       const activeIds = new Set(list.filter(x => x.status === "live").map(x => x.sessionId));
-      if (seenLiveIdsRef.current !== null && [...activeIds].some(id => !seenLiveIdsRef.current?.has(id))) {
+      if ([...activeIds].some(id => !seenLiveIdsRef.current?.has(id))) {
         setLiveOpen(true);
         if (!panicMuted) {
           const audio = panicAudioRef.current;
@@ -355,13 +355,13 @@ export default function AdminDashboard() {
     setLiveLoading(true);
     try {
       const playback = httpsCallable<{clientId: string; sessionId: string}, {url: string}>(
-        getFunctions(undefined, "southamerica-east1"), "alertaLivePlayback"
+        getFunctions(app, "southamerica-east1"), "alertaLivePlayback"
       );
       const response = await playback({clientId: code, sessionId: record.sessionId});
       if (!response.data?.url) throw new Error("No se recibió el enlace de reproducción.");
       setLiveVideoUrl(response.data.url);
     } catch (error: any) {
-      setLiveVideoError(error?.message || "No se pudo abrir la grabación. Comprueba los permisos del administrador.");
+      setLiveVideoError(error?.code === "functions/unauthenticated" || error?.code === "functions/permission-denied" ? "El acceso web aún requiere autenticación Firebase compatible con la reproducción protegida. No se abrirá el video sin autorización." : (error?.message || "No se pudo abrir la grabación."));
     } finally {
       setLiveLoading(false);
     }
