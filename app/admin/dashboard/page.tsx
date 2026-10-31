@@ -492,7 +492,7 @@ export default function AdminDashboard() {
       <MapArea profile={profile} incidents={visible} heatOnly={filter === "heatmap-only"} selected={selected} panicFocus={panicFocus} onSelect={chooseIncident}/>
       <div className={styles.threeCols}>
         <section className={styles.panel}><div className={styles.panelHead}><h2>{t('Sucesos por Fecha','Segnalazioni per data')}</h2></div>{nodes.length > 1 && <div className={styles.incidentNodeFilter}><label>{t('SELECCIONAR NODO:','SELEZIONA NODO:')}</label><select value={code} onChange={e => loadNode(e.target.value)}>{nodes.map(n => <option key={n.code} value={n.code}>{n.label === "Principal" ? `Principal (${n.code})` : `${n.label} (${n.code})`}</option>)}</select></div>}<div className={styles.dateFilters}><label>{t('Desde','Dal')}<input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}/></label><label>{t('Hasta','Al')}<input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}/></label></div><div className={styles.list}>{visible.length ? visible.slice(0, 100).map(i => <div className={`${styles.incidentRow} ${selected?.incidentId === i.incidentId ? styles.selectedRow : ""}`} key={`${i.clientCode}-${i.incidentType}-${i.incidentId}`} onClick={() => chooseIncident(i)}><i className={styles[`dot_${typeOf(i)}`]}/><div className={styles.incidentMain}><div className={styles.incidentTitle}><strong>{typeOf(i).toUpperCase()}</strong><span>{i.clientCode || code}</span></div><p>{i.description || i.descripcion || "Sin descripción"}</p><small>{i.dateString || "Fecha no disponible"}</small></div><div className={styles.incidentActions}><button type="button" className={styles.deleteBtn} title="Eliminar" onClick={e => { e.stopPropagation(); deleteIncident(i); }}>🗑</button><button type="button" className={styles.viewBtn} onClick={e => { e.stopPropagation(); chooseIncident(i); }}>{t('Ver','Visualizza')}</button></div></div>) : <div className={styles.empty}>{t('No hay sucesos para mostrar.','Nessuna segnalazione da mostrare.')}</div>}</div></section>
-        <section className={styles.panel}><div className={styles.panelHead}><h2>{t('Detalles del Suceso','Dettagli della segnalazione')}</h2></div><IncidentDetails incident={selected}/></section>
+        <section className={styles.panel}><div className={styles.panelHead}><h2>{t('Detalles del Suceso','Dettagli della segnalazione')}</h2></div><IncidentDetails incident={selected} t={t}/></section>
         <section className={styles.panel}><div className={styles.panelHead}><h2>{t('Comentarios de los Sucesos','Commenti alle segnalazioni')}</h2></div><div className={styles.comments}>{!selected ? <p>{t('Selecciona un suceso para ver los comentarios.','Seleziona una segnalazione per vedere i commenti.')}</p> : comments.length ? comments.map(c => <article key={c.id}><b>{c.userNickname || c.nombre || c.usuario || "Anónimo"}{c.timestamp ? ` (${new Date(Number(c.timestamp)).toLocaleString()})` : ""}</b><span>{c.text || c.comentario || c.mensaje || c.texto || ""}</span>{(c.imageUrl || (c.photoUrls && Object.values(c.photoUrls)[0])) && <img src={String(c.imageUrl || Object.values(c.photoUrls)[0])} alt="Comentario"/>}{c.audioUrl && <audio controls src={c.audioUrl}/>}</article>) : <p>{t('No hay comentarios para este suceso.','Nessun commento per questa segnalazione.')}</p>}</div></section>
       </div>
     </section>
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
       <div><strong>📍 Origen de la transmisión</strong><LiveOriginMap location={liveViewed.location} mapEl={liveMapEl}/></div>
       </div><div className={styles.panicModalFoot}><button onClick={() => {setLiveViewed(null);setLiveVideoUrl("");setLiveVideoError("");}}>Cerrar reproductor</button></div></div></div>}
     {profileOpen && <ProfileModal code={code} identification={identification} profile={profile} onClose={() => setProfileOpen(false)} onSaved={setProfile}/>}
-    {communityAlarmOpen && <CommunityAlarmModal code={code} sending={sendingAlarm} message={alarmMessage} onSend={sendCommunityAlarm} onClose={() => setCommunityAlarmOpen(false)}/>}
+    {communityAlarmOpen && <CommunityAlarmModal code={code} t={t} sending={sendingAlarm} message={alarmMessage} onSend={sendCommunityAlarm} onClose={() => setCommunityAlarmOpen(false)}/>}
   </main>;
 }
 
@@ -538,18 +538,18 @@ function LiveOriginMap({location,mapEl}:{location:any;mapEl:React.RefObject<HTML
   return <div style={{marginTop:10}}>{valid ? <><p style={{margin:"6px 0"}}>Latitud: {lat.toFixed(6)} · Longitud: {lng.toFixed(6)}{location?.accuracy ? ` · Precisión: ${location.accuracy} m` : ""}</p><div ref={mapEl} style={{height:260,width:"100%",borderRadius:12,background:"#e2e8f0"}}/></> : <p>Esta grabación no contiene coordenadas de origen.</p>}</div>;
 }
 
-function CommunityAlarmModal({ code, sending, message, onSend, onClose }: { code: string; sending: string | null; message: string; onSend: (key: string) => void; onClose: () => void }) {
+function CommunityAlarmModal({ code, t, sending, message, onSend, onClose }: { code: string; t: (es: string, it: string) => string; sending: string | null; message: string; onSend: (key: string) => void; onClose: () => void }) {
   const items = [
-    { key: "general", title: "ALARMA GENERAL", icon: "◉", desc: "Aviso general para toda la comunidad", cls: "communityGeneral" },
-    { key: "ayuda", title: "AYUDA", icon: "✚", desc: "Solicitud inmediata de ayuda", cls: "communityHelp" },
-    { key: "hurto", title: "HURTO", icon: "!", desc: "Alerta por hurto o situación sospechosa", cls: "communityTheft" },
-    { key: "protocolo", title: "PROTOCOLO SEGURIDAD", icon: "⬡", desc: "Activar protocolo de seguridad", cls: "communityProtocol" },
+    { key: "general", title: t("ALARMA GENERAL","ALLARME GENERALE"), icon: "◉", desc: t("Aviso general para toda la comunidad","Avviso generale per tutta la comunità"), cls: "communityGeneral" },
+    { key: "ayuda", title: t("AYUDA","AIUTO"), icon: "✚", desc: t("Solicitud inmediata de ayuda","Richiesta immediata di aiuto"), cls: "communityHelp" },
+    { key: "hurto", title: t("HURTO","FURTO"), icon: "!", desc: t("Alerta por hurto o situación sospechosa","Allarme per furto o situazione sospetta"), cls: "communityTheft" },
+    { key: "protocolo", title: t("PROTOCOLO SEGURIDAD","PROTOCOLLO DI SICUREZZA"), icon: "⬡", desc: t("Activar protocolo de seguridad","Attiva il protocollo di sicurezza"), cls: "communityProtocol" },
   ];
   return <div className={styles.communityModalBack} onMouseDown={e => { if (e.target === e.currentTarget && !sending) onClose(); }}>
     <section className={styles.communityModal}>
-      <header className={styles.communityModalHead}><div><span>CENTRO DE ALERTAS</span><h2>Alarma Comunitaria</h2><p>Nodo activo: <b>{code}</b></p></div><button onClick={onClose} disabled={!!sending}>×</button></header>
-      <div className={styles.communityModalBody}><p>Selecciona el tipo de notificación que deseas enviar a todos los usuarios del nodo.</p><div className={styles.communityAlarmGrid}>{items.map(item => <button key={item.key} className={`${styles.communityAlarmCard} ${styles[item.cls]}`} disabled={!!sending} onClick={() => onSend(item.key)}><i>{sending === item.key ? "…" : item.icon}</i><strong>{sending === item.key ? "ENVIANDO..." : item.title}</strong><span>{item.desc}</span></button>)}</div>{message && <div className={message.startsWith("✓") ? styles.communitySuccess : styles.communityWarning}>{message}</div>}</div>
-      <footer className={styles.communityModalFoot}><span>El envío utiliza la infraestructura actual de Firebase Functions.</span><button onClick={onClose} disabled={!!sending}>Cerrar</button></footer>
+      <header className={styles.communityModalHead}><div><span>{t('CENTRO DE ALERTAS','CENTRO ALLARMI')}</span><h2>{t('Alarma Comunitaria','Allarme comunitario')}</h2><p>{t('Nodo activo','Nodo attivo')}: <b>{code}</b></p></div><button onClick={onClose} disabled={!!sending}>×</button></header>
+      <div className={styles.communityModalBody}><p>{t('Selecciona el tipo de notificación que deseas enviar a todos los usuarios del nodo.','Seleziona il tipo di notifica da inviare a tutti gli utenti del nodo.')}</p><div className={styles.communityAlarmGrid}>{items.map(item => <button key={item.key} className={`${styles.communityAlarmCard} ${styles[item.cls]}`} disabled={!!sending} onClick={() => onSend(item.key)}><i>{sending === item.key ? "…" : item.icon}</i><strong>{sending === item.key ? t("ENVIANDO...","INVIO IN CORSO...") : item.title}</strong><span>{item.desc}</span></button>)}</div>{message && <div className={message.startsWith("✓") ? styles.communitySuccess : styles.communityWarning}>{message}</div>}</div>
+      <footer className={styles.communityModalFoot}><span>{t('El envío utiliza la infraestructura actual de Firebase Functions.','L’invio utilizza l’infrastruttura Firebase Functions esistente.')}</span><button onClick={onClose} disabled={!!sending}>{t('Cerrar','Chiudi')}</button></footer>
     </section>
   </div>;
 }
@@ -647,7 +647,7 @@ function MapArea({ profile, incidents, heatOnly, selected, panicFocus, onSelect 
         mapRef.current?.panTo(position);
         if ((mapRef.current?.getZoom?.() || 0) < 16) mapRef.current?.setZoom(16);
         panoRef.current?.setPosition(position);
-        infoRef.current?.setContent(`<div class="ac-map-info"><div class="ac-map-info__type">${t.toUpperCase()}</div><div class="ac-map-info__node">${incident.clientCode || ""}</div><div class="ac-map-info__date">${incident.dateString || ""}</div><div class="ac-map-info__desc">${incident.description || incident.descripcion || "Sin descripción"}</div></div>`);
+        infoRef.current?.setContent(`<div class="ac-map-info"><div class="ac-map-info__type">${t.toUpperCase()}</div><div class="ac-map-info__node">${incident.clientCode || ""}</div><div class="ac-map-info__date">${incident.dateString || ""}</div><div class="ac-map-info__desc">${incident.description || incident.descripcion || t("Sin descripción","Senza descrizione")}</div></div>`);
         infoRef.current?.open({ anchor: marker, map: mapRef.current });
       });
       markersRef.current.push(marker);
@@ -712,10 +712,10 @@ function MapArea({ profile, incidents, heatOnly, selected, panicFocus, onSelect 
   return <div className={styles.mapGrid}><section className={styles.panel}><div className={styles.panelHead}><h2>Mapa General</h2></div><div className={styles.googleMap} ref={mapEl}>{error && <div className={styles.mapError}>{error}</div>}</div></section><section className={styles.panel}><div className={styles.panelHead}><h2>Vista Street View</h2></div><div className={styles.street} ref={streetEl}/></section></div>;
 }
 
-function IncidentDetails({ incident }: { incident: Incident | null }) {
-  if (!incident) return <div className={styles.detailsEmpty}>Selecciona un marcador en el mapa o un suceso de la lista para ver los detalles.</div>;
+function IncidentDetails({ incident, t }: { incident: Incident | null; t: (es: string, it: string) => string }) {
+  if (!incident) return <div className={styles.detailsEmpty}>{t("Selecciona un marcador en el mapa o un suceso de la lista para ver los detalles.","Seleziona un indicatore sulla mappa o una segnalazione dall’elenco per visualizzarne i dettagli.")}</div>;
   const photos = incident.photoUrls && typeof incident.photoUrls === "object" ? Object.values(incident.photoUrls).filter(v => typeof v === "string") as string[] : [];
-  return <div className={styles.details}><h3>Tipo: {incident.type || incident.incidentType || "N/A"}</h3><p><b>Fecha:</b> {incident.dateString || "N/A"}</p><p><b>Descripción:</b> {incident.description || incident.descripcion || "Sin descripción"}</p>{photos.length > 0 && <div className={styles.photos}>{photos.map((url, k) => <a key={k} href={url} target="_blank" rel="noreferrer"><img src={url} alt="Foto del suceso"/></a>)}</div>}{incident.audioUrl && <audio controls src={incident.audioUrl}/>}</div>;
+  return <div className={styles.details}><h3>{t("Tipo","Tipo")}: {incident.type || incident.incidentType || "N/A"}</h3><p><b>{t("Fecha","Data")}:</b> {incident.dateString || "N/A"}</p><p><b>{t("Descripción","Descrizione")}:</b> {incident.description || incident.descripcion || "Sin descripción"}</p>{photos.length > 0 && <div className={styles.photos}>{photos.map((url, k) => <a key={k} href={url} target="_blank" rel="noreferrer"><img src={url} alt="Foto del suceso"/></a>)}</div>}{incident.audioUrl && <audio controls src={incident.audioUrl}/>}</div>;
 }
 
 
