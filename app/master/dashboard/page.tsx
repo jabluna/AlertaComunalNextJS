@@ -45,6 +45,7 @@ const emptyClient = {
   habilitarLogo: "no",
   habilitarNombreComercial: "no",
   habilitarPanicoPorVoz: "no",
+  habilitarMultiidioma: "no",
   initialAddress: "",
   initialLat: "",
   initialLng: "",
@@ -118,7 +119,7 @@ export default function MasterDashboardPage() {
   const [registeredEmails, setRegisteredEmails] = useState<string[]>([]);
   const [clientPasswords, setClientPasswords] = useState<Record<string,string>>({});
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string,boolean>>({});
-  const [additional, setAdditional] = useState<any>({codigo:"",password:"",identificacion:"",nombre:"",ciudad:"",chat:"no",habilitarLogo:"no",habilitarNombreComercial:"no",habilitarPanicoPorVoz:"no",tipoPlan:"",valorPlan:"",emails:"0",fecha:"",initialAddress:"",initialLat:"",initialLng:""});
+  const [additional, setAdditional] = useState<any>({codigo:"",password:"",identificacion:"",nombre:"",ciudad:"",chat:"no",habilitarLogo:"no",habilitarNombreComercial:"no",habilitarPanicoPorVoz:"no",habilitarMultiidioma:"no",tipoPlan:"",valorPlan:"",emails:"0",fecha:"",initialAddress:"",initialLat:"",initialLng:""});
   const [planSearch, setPlanSearch] = useState("");
   const [planPage, setPlanPage] = useState(1);
   const planPageSize = 10;
@@ -282,6 +283,7 @@ export default function MasterDashboardPage() {
       habilitarLogo: row.permitirLogo ? "si":"no",
       habilitarNombreComercial: row.permitirNombreComercial ? "si":"no",
       habilitarPanicoPorVoz: row.permitirPanicoPorVoz ? "si":"no",
+      habilitarMultiidioma: row.permitirMultiidioma ? "si":"no",
       initialAddress: row.punto_inicial?.address || "",
       initialLat: row.punto_inicial?.lat || "",
       initialLng: row.punto_inicial?.lng || "",
@@ -334,6 +336,7 @@ export default function MasterDashboardPage() {
         permitirLogo:form.habilitarLogo==="si",
         permitirNombreComercial:form.habilitarNombreComercial==="si",
         permitirPanicoPorVoz:form.habilitarPanicoPorVoz==="si",
+        permitirMultiidioma:form.habilitarMultiidioma==="si",
         punto_inicial:{address:form.initialAddress.trim(),lat:form.initialLat,lng:form.initialLng}
       };
       const data:any = form.clientType==="empresa" ? {
@@ -546,7 +549,7 @@ export default function MasterDashboardPage() {
         password:additional.password,chatActivado:additional.chat==="si", estado:"activo",
         nodoAdicional:true,nodoOrigen:registeredNode,creadoDesdeGestionClientes:true,fechaCreacionNodoAdicional:new Date().toISOString(),
         punto_inicial:{address:String(additional.initialAddress||"").trim(),lat:String(additional.initialLat||""),lng:String(additional.initialLng||"")},
-        permitirLogo:additional.habilitarLogo==="si", permitirNombreComercial:additional.habilitarNombreComercial==="si", permitirPanicoPorVoz:additional.habilitarPanicoPorVoz==="si",
+        permitirLogo:additional.habilitarLogo==="si", permitirNombreComercial:additional.habilitarNombreComercial==="si", permitirPanicoPorVoz:additional.habilitarPanicoPorVoz==="si", permitirMultiidioma:additional.habilitarMultiidioma==="si",
       };
       delete data.rowKey; delete data.identificacion;
       const key=safeEmailKey(registeredEmail);
@@ -717,6 +720,7 @@ export default function MasterDashboardPage() {
               <div className={styles.featurePermission}><Field label="Habilitar Logo"><select value={form.habilitarLogo} onChange={e=>setField("habilitarLogo",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Personalización del logo.</small></Field></div>
               <div className={styles.featurePermission}><Field label="Habilitar Nombre Comercial"><select value={form.habilitarNombreComercial} onChange={e=>setField("habilitarNombreComercial",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Nombre comercial propio.</small></Field></div>
               <div className={`${styles.featurePermission} ${styles.voicePanicPermission}`}><Field label="Habilitar Pánico por Voz"><select value={form.habilitarPanicoPorVoz} onChange={e=>setField("habilitarPanicoPorVoz",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Autoriza esta función para el nodo.</small></Field></div>
+               <div className={styles.featurePermission}><Field label="Habilitar Multiidioma"><select value={form.habilitarMultiidioma} onChange={e=>setField("habilitarMultiidioma",e.target.value)}><option value="no">No</option><option value="si">Sí</option></select><small>Habilita Español e Italiano para el nodo.</small></Field></div>
             </div></Section>
             {form.clientType==="empresa" && <Section title="Datos de empresa"><Grid>
               <Input label="NIT" value={form.nit} set={v=>setField("nit",v)} required/><Input label="Código de cliente" value={form.codigoClienteEmpresa} set={v=>setField("codigoClienteEmpresa",v)} required disabled={!!editing}/>
