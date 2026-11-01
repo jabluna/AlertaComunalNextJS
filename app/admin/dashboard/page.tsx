@@ -378,13 +378,20 @@ export default function AdminDashboard() {
   const deleteLiveRecording = useCallback(async (record: AnyRecord) => {
     const sessionId = String(record.sessionId || "");
     if (!sessionId || liveDeleting) return;
-    if (!window.confirm(t(`¿Eliminar definitivamente la grabación de ${record.publisherName || "este usuario"}? Se borrará el video de Storage y no se podrá recuperar.`,`Eliminare definitivamente la registrazione di ${record.publisherName || "questo utente"}? Il video verrà cancellato e non potrà essere recuperato.`))) return;
+    const confirmed = window.confirm(t(
+      `¿Eliminar definitivamente la grabación de ${record.publisherName || "este usuario"}? Se borrará el video de Storage y no se podrá recuperar.`,
+      `Eliminare definitivamente la registrazione di ${record.publisherName || "questo utente"}? Il video verrà cancellato e non potrà essere recuperato.`
+    ));
+    if (!confirmed) return;
     setLiveDeleting(sessionId);
     try {
+      if (!auth.currentUser) throw new Error(t("La sesión ha caducado. Inicia sesión nuevamente.","La sessione è scaduta. Accedi nuovamente."));
       const action = httpsCallable<{clientId:string;sessionId:string},{ok:boolean}>(
-        getFunctions(app,"southamerica-east1"),"alertaLiveDeleteRecording"
+        getFunctions(app,"southamerica-east1"), "alertaLiveDeleteRecording",
+        {timeout: 20000}
       );
-      await action({clientId:code,sessionId});
+      const response = await action({clientId:code,sessionId});
+      if (response.data?.ok !== true) throw new Error(t("Firebase no confirmó la eliminación.","Firebase non ha confermato l'eliminazione."));
       setLiveRecordings(previous => previous.filter(x => String(x.sessionId) !== sessionId));
       if (liveViewed?.sessionId === sessionId) {
         setLiveViewed(null);
@@ -392,7 +399,10 @@ export default function AdminDashboard() {
       }
     } catch (error:any) {
       console.error("Alerta Live: fallo al eliminar grabación", {sessionId, clientId:code, error});
-      window.alert(`${t("No fue posible eliminar la grabación","Impossibile eliminare la registrazione")}: ${error?.code || "error"} — ${error?.message || t("Error desconocido","Errore sconosciuto")}`);
+      const detail = error?.code === "functions/deadline-exceeded"
+        ? t("Firebase no respondió en 20 segundos. Comprueba si el video sigue disponible antes de reintentar.","Firebase non ha risposto entro 20 secondi. Controlla se il video è ancora disponibile prima di riprovare.")
+        : `${error?.code || "error"} — ${error?.message || t("Error desconocido","Errore sconosciuto")}`;
+      window.alert(`${t("No fue posible confirmar la eliminación","Impossibile confermare l'eliminazione")}: ${detail}`);
     } finally {
       setLiveDeleting(null);
     }
