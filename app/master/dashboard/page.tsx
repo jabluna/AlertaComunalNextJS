@@ -378,7 +378,11 @@ export default function MasterDashboardPage() {
     setBusy(true);
     try {
       const fn = httpsCallable(functions,"deleteAllClientData");
-      await fn({clientId:deleteTarget.codigoCliente,identificacion:deleteTarget.identificacion,password:deleteTarget.password,logoUrl:deleteTarget.logoUrl||null});
+      // La Cloud Function recibe codigoCliente (clave real del nodo en RTDB), no clientId.
+      const codigoCliente = String(deleteTarget.codigoCliente || "").trim();
+      const identificacion = String(deleteTarget.identificacion || "").trim();
+      if (!codigoCliente || !identificacion) throw new Error("Faltan el código de cliente o la identificación del registro seleccionado.");
+      await fn({codigoCliente,identificacion,password:deleteTarget.password,logoUrl:deleteTarget.logoUrl||null});
       flash("Cliente eliminado definitivamente.");
       setModal(null); setDeleteTarget(null);
     } catch(err:any) { flash(`No se pudo eliminar: ${err?.message||"error"}`,"error"); }
