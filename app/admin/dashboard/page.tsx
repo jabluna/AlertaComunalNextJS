@@ -651,16 +651,31 @@ function MapArea({ profile, incidents, heatOnly, selected, panicFocus, onSelect 
       if (!position) return;
       points.push(new window.google.maps.LatLng(position.lat, position.lng));
       if (heatOnly) return;
-      const t = typeOf(incident);
-      const icon = t === "accidente" ? "/images/marker-red.svg" : t === "hurto" ? "/images/marker-green.svg" : t === "homicidio" ? "/images/marker-violet.svg" : t === "otro" ? "/images/marker-yellow.svg" : "/images/marker-blue.svg";
-      const marker = new window.google.maps.Marker({ position, map: mapRef.current, title: `${t} (${incident.clientCode || ""})`, icon: { url: icon, scaledSize: new window.google.maps.Size(33, 60) } });
-      marker.addListener("click", () => {
+      const incidentType = typeOf(incident);
+      const icon = incidentType === "accidente"
+  ? "/images/marker-red.svg"
+  : incidentType === "hurto"
+    ? "/images/marker-green.svg"
+    : incidentType === "homicidio"
+      ? "/images/marker-violet.svg"
+      : incidentType === "otro"
+        ? "/images/marker-yellow.svg"
+        : "/images/marker-blue.svg";
+
+const marker = new window.google.maps.Marker({
+  position,
+  map: mapRef.current,
+  title: `${incidentType} (${incident.clientCode || ""})`,
+  icon: {
+    url: icon,
+    scaledSize: new window.google.maps.Size(33, 60)
+  }
+}); marker.addListener("click", () => {
         onSelect(incident);
         mapRef.current?.panTo(position);
         if ((mapRef.current?.getZoom?.() || 0) < 16) mapRef.current?.setZoom(16);
         panoRef.current?.setPosition(position);
-        infoRef.current?.setContent(`<div class="ac-map-info"><div class="ac-map-info__type">${t.toUpperCase()}</div><div class="ac-map-info__node">${incident.clientCode || ""}</div><div class="ac-map-info__date">${incident.dateString || ""}</div><div class="ac-map-info__desc">${incident.description || incident.descripcion || t("Sin descripción","Senza descrizione")}</div></div>`);
-        infoRef.current?.open({ anchor: marker, map: mapRef.current });
+        infoRef.current?.setContent(`<div class="ac-map-info"><div class="ac-map-info__type">${incidentType.toUpperCase()}</div><div class="ac-map-info__node">${incident.clientCode || ""}</div><div class="ac-map-info__date">${incident.dateString || ""}</div><div class="ac-map-info__desc">${incident.description || incident.descripcion || "Sin descripción"}</div></div>`);infoRef.current?.open({ anchor: marker, map: mapRef.current });
       });
       markersRef.current.push(marker);
     });
